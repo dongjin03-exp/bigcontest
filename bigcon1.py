@@ -568,6 +568,43 @@ print("SHAP Summary Plot 생성 완료 (shap_summary_v3.png 저장)")
 # - x축: SHAP 값 (양수는 폐업(1) 예측에 기여 증가, 음수는 감소)
 # - 점 색상: 피처 값의 크기 (빨강=높음, 파랑=낮음)
 
+# 4) 개별 가맹점 진단 리포트: SHAP Force Plot (HTML 저장)
+print("개별 가맹점 Force Plot 생성 및 저장 중...")
+
+# SHAP JS 초기화 (노트북/HTML 상호작용용)
+shap.initjs()
+
+# LightGBM의 shap_values는 [class0, class1] 리스트를 반환
+shap_values_class1 = shap_values[1] if isinstance(shap_values, list) else shap_values
+
+# 예측 결과에서 첫 번째 위험군(1)과 안전군(0) 인덱스 찾기
+pred_series = pd.Series(y3_pred).reset_index(drop=True)
+X3_test_reset = X3_test.reset_index(drop=True)
+
+first_risky_idx = pred_series[pred_series == 1].index[0] if (pred_series == 1).any() else None
+first_safe_idx = pred_series[pred_series == 0].index[0] if (pred_series == 0).any() else None
+
+def save_force_plot(sample_index: int, label: str, file_name: str):
+	# 예상값(베이스라인), SHAP 값(한 행), 입력값(한 행)을 전달
+	expected_value = explainer.expected_value[1] if isinstance(explainer.expected_value, (list, np.ndarray)) else explainer.expected_value
+	shap_row = shap_values_class1[sample_index]
+	features_row = X3_test_reset.iloc[sample_index]
+	force_fig = shap.force_plot(expected_value, shap_row, features_row, matplotlib=False)
+	shap.save_html(file_name, force_fig)
+	print(f"{label} Force Plot 저장: {file_name}")
+
+# 사례 1: 위험군
+if first_risky_idx is not None:
+	save_force_plot(first_risky_idx, "위험군(예측=1)", "forceplot_risky.html")
+else:
+	print("경고: 예측=1 샘플을 찾지 못했습니다.")
+
+# 사례 2: 안전군
+if first_safe_idx is not None:
+	save_force_plot(first_safe_idx, "안전군(예측=0)", "forceplot_safe.html")
+else:
+	print("경고: 예측=0 샘플을 찾지 못했습니다.")
+
 # 10. 생존 분석: 콕스 비례위험 모델
 # =============================
 print("\n=== 생존 분석 (CoxPH) 시작 ===")
